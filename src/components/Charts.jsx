@@ -204,7 +204,7 @@ const Charts = ({ data, chartType }) => {
 
     return (
       <div className="chart-box weekly-trends">
-        <h2 className="chart-title">Weekly Health Trends</h2>
+        <h2 className="chart-title">Weekly Health Trends:</h2>
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={weeklyBarData}>
             <XAxis dataKey="date" stroke="#999" />
