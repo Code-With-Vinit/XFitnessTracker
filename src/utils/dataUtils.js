@@ -1,57 +1,79 @@
 // src/utils/dataUtils.js
 
-// Function to format the date string to the required 'YYYY-MM-DD' format
-export const formatDate = (dateString) => {
-  const date = new Date(dateString);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
+// ... (other functions: formatDate, loadData, saveData) ...
 
-// Gets the data from localStorage or returns default data structure
 export const loadData = () => {
-  const storedData = localStorage.getItem('healthAndFitness');
-  return storedData ? JSON.parse(storedData) : [];
+    const storedData = localStorage.getItem('healthAndFitness');
+    return storedData ? JSON.parse(storedData) : [];
 };
 
 export const saveData = (data) => {
-  localStorage.setItem('healthAndFitness', JSON.stringify(data));
+    localStorage.setItem('healthAndFitness', JSON.stringify(data));
 };
 
-// Generates data for the Bar Chart (Last 7 days, excluding today)
+export const getOverallPieData = (data) => {
+  // Use reduce to sum up total intake and total burned across all data entries
+  const totalIntake = data.reduce((sum, item) => sum + parseInt(item.calorieIntake, 10), 0);
+  const totalBurned = data.reduce((sum, item) => sum + parseInt(item.calorieBurned, 10), 0);
+  
+  // Calculate the grand total for percentage calculations
+  const grandTotal = totalIntake + totalBurned;
+
+  // Return the data formatted for the Pie Chart.
+  // We use the sum as the 'value' for Recharts.
+  return [
+    { name: 'Intake', value: totalIntake, percent: grandTotal > 0 ? Math.round((totalIntake / grandTotal) * 100) : 0 },
+    { name: 'Burned', value: totalBurned, percent: grandTotal > 0 ? Math.round((totalBurned / grandTotal) * 100) : 0 },
+  ];
+};
+
+
+// Generates data for the Bar Chart (Last 7 days)
 export const getWeeklyBarData = (data) => {
   if (data.length === 0) return [];
   
-  // Sort data by date descending (most recent first)
+  // 1. Sort data by date descending (most recent first)
   const sortedData = [...data].sort((a, b) => new Date(b.date) - new Date(a.date));
 
-  // Get only the unique last 7 days (by date)
+  // 2. Use a Map to aggregate data for each unique date
   const weeklyDataMap = new Map();
+  let uniqueDatesCount = 0;
+  
   for (const item of sortedData) {
-    if (!weeklyDataMap.has(item.date)) {
-      weeklyDataMap.set(item.date, {
-        date: formatDate(item.date),
-        calorieIntake: parseInt(item.calorieIntake, 10),
-        calorieBurned: parseInt(item.calorieBurned, 10),
-      });
+    const dateKey = item.date; // e.g., "2024-01-10"
+    
+    // Check if we've already collected data for 7 unique dates
+    // If we have, and the current item's date is different from the 7th date, skip it.
+    // If we have 7, we break only AFTER processing the 7th unique date fully.
+    
+    const isNewDate = !weeklyDataMap.has(dateKey);
+
+    if (isNewDate) {
+        if (uniqueDatesCount >= 7) {
+            // If we encounter an 8th unique date, we stop the loop
+            break;
+        }
+        
+        // Initialize the new unique date entry
+        weeklyDataMap.set(dateKey, {
+            date: dateKey,
+            calorieIntake: 0,
+            calorieBurned: 0,
+        });
+        uniqueDatesCount++;
     }
-    // Stop after collecting 7 unique days
-    if (weeklyDataMap.size >= 7) break;
+    
+    // Aggregate metrics for that day (handles multiple entries per day)
+    const current = weeklyDataMap.get(dateKey);
+    weeklyDataMap.set(dateKey, {
+      ...current,
+      // Ensure we parse the string values to integers before summing
+      calorieIntake: current.calorieIntake + parseInt(item.calorieIntake, 10),
+      calorieBurned: current.calorieBurned + parseInt(item.calorieBurned, 10),
+    });
   }
   
-  // Return data in ascending date order for chart rendering
+  // 3. Convert Map values to an array and sort by date ascending for chart rendering
+  // This array will contain a maximum of 7 aggregated days.
   return Array.from(weeklyDataMap.values()).sort((a, b) => new Date(a.date) - new Date(b.date));
-};
-
-// Generates data for the Pie Chart (Overall Totals)
-export const getOverallPieData = (data) => {
-  const totalIntake = data.reduce((sum, item) => sum + parseInt(item.calorieIntake, 10), 0);
-  const totalBurned = data.reduce((sum, item) => sum + parseInt(item.calorieBurned, 10), 0);
-  const total = totalIntake + totalBurned;
-
-  return [
-    { name: 'Intake', value: totalIntake, percent: total > 0 ? Math.round((totalIntake / total) * 100) : 50 },
-    { name: 'Burned', value: totalBurned, percent: total > 0 ? Math.round((totalBurned / total) * 100) : 50 },
-  ];
 };
